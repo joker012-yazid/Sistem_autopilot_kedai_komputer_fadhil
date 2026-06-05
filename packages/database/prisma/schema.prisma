@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CaredeskRole {
+  owner
+  technician
+}
+
+enum CaredeskJobStatus {
+  NEW_JOB
+  WAITING_FADHIL_REVIEW
+  WAITING_CUSTOMER_CONFIRMATION
+  IN_PROGRESS
+  NOT_PROCEED
+  READY_PICKUP
+  UNCLAIMED
+  COMPLETE
+}
+
+enum CaredeskChecklistStatus {
+  not_started
+  draft
+  submitted
+}
+
+enum CaredeskPaymentStatus {
+  pending
+  paid
+  refunded
+}
+
+enum CaredeskPaymentMethod {
+  cash
+  transfer
+  card
+}
+
+model CaredeskUser {
+  id        String       @id @default(cuid())
+  name      String
+  email     String       @unique
+  phone     String?
+  role      CaredeskRole
+  status    String       @default("active")
+  passwordHash String?
+  passwordSalt String?
+  passwordUpdatedAt DateTime?
+  lastLoginAt DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  jobs      CaredeskJob[] @relation("AssignedTechnician")
+  sessions  CaredeskSession[]
+}
+
+model CaredeskSession {
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  userAgent String?
+  ipHash    String?
+  user      CaredeskUser @relation(fields: [userId], references: [id])
+}
+
+model CaredeskCustomer {
+  id               String           @id @default(cuid())
+  name             String
+  phone            String
+  secondaryContact String?
+  preferredChannel String
+  notes            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  devices          CaredeskDevice[]
+  jobs             CaredeskJob[]
+}
+
+model CaredeskDevice {
+  id           String           @id @default(cuid())
+  customerId   String
+  type         String
+  brand        String
+  model        String?
+  serialNumber String?
+  accessories  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  customer     CaredeskCustomer @relation(fields: [customerId], references: [id])
+  jobs         CaredeskJob[]
+}
+
+model CaredeskJob {
+  id                   String                    @id @default(cuid())
+  jobIdDisplay         String                    @unique
+  rawReportNumber      String
+  status               CaredeskJobStatus
+  customerId           String
+  deviceId             String
+  assignedTechnicianId String?
+  reportedIssue        String
+  diagnosisNotes       String?
+  ownerInstruction     String?
+  posReference         String?
+  customerDecision     Json?
+  readyPickupDate      DateTime?
+  lastUpdate           String
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  customer             CaredeskCustomer          @relation(fields: [customerId], references: [id])
+  device               CaredeskDevice            @relation(fields: [deviceId], references: [id])
+  assignedTechnician   CaredeskUser?             @relation("AssignedTechnician", fields: [assignedTechnicianId], references: [id])
+  assignments          CaredeskJobAssignment[]
+  evidence             CaredeskEvidenceFile[]
+  timeline             CaredeskTimelineEvent[]
+  notifications        CaredeskNotification[]
+  checklistReport      CaredeskChecklistReport?
+  payment              CaredeskPayment?
+}
+
+model CaredeskJobAssignment {
+  id           String   @id @default(cuid())
+  jobId        String
+  technicianId String
+  action       String
+  createdAt    DateTime @default(now())
+  job          CaredeskJob @relation(fields: [jobId], references: [id])
+}
+
+model CaredeskEvidenceFile {
+  id               String   @id @default(cuid())
+  jobId            String
+  category         String
+  section          String?
+  fileName         String
+  storagePath      String
+  mimeType         String
+  sizeBytes        Int
+  caption          String?
+  uploadedByUserId String
+  createdAt        DateTime @default(now())
+  job              CaredeskJob @relation(fields: [jobId], references: [id])
+}
+
+model CaredeskTimelineEvent {
+  id          String   @id @default(cuid())
+  jobId       String
+  type        String
+  title       String
+  detail      String
+  actorUserId String
+  createdAt   DateTime @default(now())
+  job         CaredeskJob @relation(fields: [jobId], references: [id])
+}
+
+model CaredeskNotification {
+  id             String   @id @default(cuid())
+  jobId          String
+  technicianId   String?
+  stageDay       Int?
+  channel        String
+  status         String
+  result         String?
+  method         String?
+  note           String?
+  messagePreview String
+  createdAt      DateTime @default(now())
+  contactedAt    DateTime?
+  job            CaredeskJob @relation(fields: [jobId], references: [id])
+}
+
+model CaredeskChecklistReport {
+  id               String                   @id @default(cuid())
+  jobId            String                   @unique
+  status           CaredeskChecklistStatus  @default(not_started)
+  technicianId     String?
+  deviceInfo       Json
+  initialCheck     Json
+  drive            Json
+  battery          Json
+  ram              Json
+  diagnosisSummary String                   @default("")
+  lastUpdated      DateTime                 @default(now())
+  job              CaredeskJob              @relation(fields: [jobId], references: [id])
+  images           CaredeskChecklistImage[]
+}
+
+model CaredeskChecklistImage {
+  id               String   @id @default(cuid())
+  reportId         String
+  jobId            String
+  section          String
+  fileName         String
+  storagePath      String
+  mimeType         String
+  sizeBytes        Int
+  caption          String?
+  uploadedByUserId String
+  createdAt        DateTime @default(now())
+  report           CaredeskChecklistReport @relation(fields: [reportId], references: [id])
+}
+
+model CaredeskCustomerReport {
+  id        String   @id @default(cuid())
+  jobId     String   @unique
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CaredeskPayment {
+  id            String               @id @default(cuid())
+  jobId         String               @unique
+  amount        Float
+  method        CaredeskPaymentMethod
+  status        CaredeskPaymentStatus @default(pending)
+  recordedBy    String
+  proofFileId   String?
+  note          String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  job           CaredeskJob          @relation(fields: [jobId], references: [id])
+}
+
+model CaredeskSettings {
+  id                String   @id @default("default")
+  shopInfo          Json
+  defaultLanguage   String   @default("bm")
+  posReferenceLabel String   @default("POS Reference")
+  flowRules         Json
+  notificationTemplates Json?
+  scannerSettings   Json?
+  updatedAt         DateTime @updatedAt
+}
+
+model CaredeskAuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  detail    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}

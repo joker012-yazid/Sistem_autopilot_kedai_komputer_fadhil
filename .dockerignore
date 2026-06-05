@@ -1,0 +1,17 @@
+node_modules/
+.git/
+.next/
+.next-build/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+.data/
+.cache/
+.turbo/
+.codex-logs/
+*.log
+*.tsbuildinfo
+.env
+.env.*

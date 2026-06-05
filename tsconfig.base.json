@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "baseUrl": ".",
+    "paths": {
+      "@repair-ops/domain": ["packages/domain/src/index.ts"],
+      "@repair-ops/domain/*": ["packages/domain/src/*"],
+      "@repair-ops/config": ["packages/config/src/index.ts"],
+      "@repair-ops/database": ["packages/database/src/index.ts"],
+      "@repair-ops/test-utils": ["packages/test-utils/src/index.ts"]
+    }
+  }
+}

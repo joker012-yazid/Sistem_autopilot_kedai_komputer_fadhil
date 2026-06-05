@@ -1,0 +1,75 @@
+# Fadhil CareDesk Backend/API Handoff
+
+This note lists the active backend contract after the hard legacy removal. Fadhil CareDesk now exposes only repair operations under `/caredesk/*`; legacy Store Staff, quotation, payment, invoice, and approval-link routes are no longer runtime API surfaces.
+
+## Active Public Surface
+
+- `GET /caredesk/auth/setup-status`
+- `POST /caredesk/auth/setup`
+- `POST /caredesk/auth/login`
+- `POST /caredesk/auth/logout`
+- `GET /caredesk/auth/me`
+- `GET /caredesk/session`
+- `/caredesk/users/*`
+- `/caredesk/service-notes/scan`
+- `/caredesk/jobs/*`
+- `/caredesk/checklist-reports/*`
+- `/caredesk/pickup`
+- `/caredesk/notifications`
+- `/caredesk/customers/*`
+- `/caredesk/reports`
+- `/caredesk/settings`
+- CareDesk Customer Report and Checklist Report PDF endpoints.
+
+## Core Contracts
+
+- Auth/session uses the `caredesk_session` HttpOnly cookie backed by `CaredeskSession`; demo `x-user-id` is no longer runtime auth.
+- Active roles are only `owner` and `technician`; disabled users, revoked sessions, expired sessions, and unknown actors are rejected.
+- First Owner setup is allowed only when no active Owner exists and the request includes `CAREDESK_SETUP_TOKEN`.
+- Passwords are stored as scrypt hashes with random salts. Setup/create/reset password requires at least 8 characters with at least one letter and one number.
+- Mutating browser requests validate `Origin` against `CAREDESK_WEB_ORIGIN` plus local development origins.
+- At least one active Owner account must remain; the last active Owner cannot be disabled or demoted.
+- Jobs use service report numbers as display IDs, for example `NO.0007`, with raw report number `0007`.
+- Job statuses are locked to `NEW JOB`, `WAITING FADHIL REVIEW`, `WAITING CUSTOMER CONFIRMATION`, `IN PROGRESS`, `NOT PROCEED`, `READY PICKUP`, `UNCLAIMED`, and `COMPLETE`.
+- Technician assignment supports take/release history with timeline and audit events where relevant.
+- Timeline returns status, diagnosis, evidence, owner review, customer decision, pickup, notification, checklist report, customer report, settings, export, and audit events.
+- Role filtering is enforced server-side: Owner can view all operational data; Technician can view and act only on assigned or actionable repair work.
+
+## Workflow APIs
+
+- Scan Job: upload service note, extract service report number/customer/device/issue, then create job only after technician confirms.
+- Technician: take job, release job, save diagnosis, upload evidence, submit to Owner, update repair progress, mark ready pickup, notify customer, and complete pickup.
+- Owner Review: read diagnosis/evidence, save owner instruction, save optional POS reference, approve for customer confirmation, and decide unclaimed jobs.
+- Customer Decision: record proceed/not proceed, method, note, required reason for not proceed, and optional WhatsApp screenshot evidence.
+- Pickup: calculate reminder stage from `readyPickupDate`, record Day 0/7/14/30/60 contact attempts, and allow Owner to mark Day 90 jobs as `UNCLAIMED`.
+- Notifications: store contact log records with stage day, channel, status, result, contacted time, message preview, linked job, and assigned technician.
+
+## Module Contracts
+
+- Checklist Report is a separate module linked to Job ID. Technician can save draft, submit, and continue editing; Owner is read-only with preview/print/copy summary.
+- Checklist Report stores device info, initial check, drive health, battery report, RAM specification, diagnosis summary, and images per section: initial check, drive, battery, RAM, and diagnosis.
+- Customer Report stays inside Job Detail as a customer-facing diagnosis/evidence summary with Preview, Print/Save as PDF, and Copy WhatsApp Summary.
+- Customers expose profile, active jobs, job history, device history, contact history, and POS reference fields with role filtering.
+- Reports are Owner-only operational reports: job summary, status breakdown, technician workload, pickup report, not proceed report, completed history, and export audit events.
+- Settings are Owner-only and persist shop info, default language, POS reference label, notification templates, upload rules, editable flow rules, and locked core rules.
+- Users & Roles inside Settings is Owner-only account management for creating, disabling/reactivating, editing, and manually resetting Owner/Technician accounts.
+
+## Production Data Notes
+
+- Required deployment environment variables: `DATABASE_URL`, `CAREDESK_SETUP_TOKEN`, `CAREDESK_WEB_ORIGIN`, and frontend `NEXT_PUBLIC_API_BASE_URL`.
+- Cookie behavior: `HttpOnly`, `SameSite=Lax`, 12-hour expiry, and `Secure` when `NODE_ENV=production`.
+- `CAREDESK_SETUP_TOKEN` should be a one-time deployment secret. Rotate or remove it after the first active Owner has been created.
+- Evidence and checklist images need binary storage through a backend adapter; frontend data URLs are prototype-only.
+- Customer Report and Checklist Report PDFs are generated by the backend through the CareDesk PDF service.
+- Reminder automation in the prototype is calculated on screen. Production can keep calculation on read, or later add a scheduler, but stored notification records must remain auditable.
+- POS reference is only a reference string/label. Official price, quotation, invoice, receipt, and payment stay in the POS system.
+
+## Out Of Scope
+
+- Store Staff role.
+- Quotation module.
+- Payment module.
+- Invoice or receipt handling.
+- Customer approval links.
+- Sales totals or accounting reports.
+- Internal handling of official price or payment proof beyond optional POS reference.

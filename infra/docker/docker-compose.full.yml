@@ -1,0 +1,96 @@
+x-api-build: &api-build
+  context: ../..
+  dockerfile: infra/docker/Dockerfile.api
+
+name: repair-ops
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-repair_ops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-repair_ops}
+      POSTGRES_DB: ${POSTGRES_DB:-repair_ops}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  db-setup:
+    image: repair-ops-api:local
+    build: *api-build
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://repair_ops:repair_ops@postgres:5432/repair_ops}
+    command: ["corepack", "pnpm", "--filter", "@repair-ops/database", "prisma", "db", "push", "--skip-generate"]
+    restart: "no"
+
+  api:
+    image: repair-ops-api:local
+    build: *api-build
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-setup:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: ${DATABASE_URL:-postgresql://repair_ops:repair_ops@postgres:5432/repair_ops}
+      SESSION_SECRET: ${SESSION_SECRET:-replace-with-a-random-session-secret}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      STORAGE_ROOT: ${STORAGE_ROOT:-/app/.data/evidence}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      API_BASE_URL: ${API_BASE_URL:-http://api:4000}
+      CAREDESK_WEB_ORIGIN: ${CAREDESK_WEB_ORIGIN:-http://localhost:3000}
+      CAREDESK_COOKIE_SECURE: ${CAREDESK_COOKIE_SECURE:-false}
+      CAREDESK_SETUP_TOKEN: ${CAREDESK_SETUP_TOKEN:-replace-with-one-time-setup-token-123}
+      CAREDESK_PDF_RENDER_TIMEOUT_MS: ${CAREDESK_PDF_RENDER_TIMEOUT_MS:-30000}
+      NOTIFICATION_MODE: ${NOTIFICATION_MODE:-test}
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+    ports:
+      - "4000:4000"
+    volumes:
+      - caredesk-evidence:/app/.data/evidence
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(async (r) => { const body = await r.json(); process.exit(r.ok && body.status === 'ok' ? 0 : 1); }).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  web:
+    image: repair-ops-web:local
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+volumes:
+  postgres-data:
+  caredesk-evidence:
