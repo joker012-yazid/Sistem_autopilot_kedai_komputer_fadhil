@@ -380,3 +380,5 @@ Then check:
 The included Docker compose files are intended for local development and self-hosted evaluation. For real production, use strong secrets, HTTPS, managed backups, restricted storage access, and Prisma migrations instead of `db push`.
 
 See `docs/deployment.md` for the production checklist and `docs/development.md` for deeper local development notes.
+#   S i s t e m _ a u t o p i l o t _ k e d a i _ k o m p u t e r _ f a d h i l  
+ 
