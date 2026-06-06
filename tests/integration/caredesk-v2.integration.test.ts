@@ -2,6 +2,9 @@
 import { PrismaClient } from "@prisma/client";
 import { createApiTestApp } from "@repair-ops/test-utils";
 import { execSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import request from "supertest";
 import { CaredeskCronService } from "../../apps/api/src/caredesk/caredesk-cron.service";
 import { CaredeskDisplayEventsService } from "../../apps/api/src/caredesk/caredesk-display-events.service";
@@ -487,6 +490,52 @@ describe("caredesk v2 clean backend", () => {
     expect(reloaded.body.scannerSettings.apiKey).toBeUndefined();
   });
 
+  it("auto-generates the scanner encryption key when Owner saves an API key without manual env setup", async () => {
+    const previousKey = process.env.CAREDESK_SETTINGS_ENCRYPTION_KEY;
+    const previousKeyFile = process.env.CAREDESK_SETTINGS_ENCRYPTION_KEY_FILE;
+    const tempDir = mkdtempSync(join(tmpdir(), "caredesk-settings-runtime-"));
+    const keyFile = join(tempDir, "settings-encryption.key");
+    const rawApiKey = "sk-owner-secret-autogen-1234567890";
+    try {
+      delete process.env.CAREDESK_SETTINGS_ENCRYPTION_KEY;
+      process.env.CAREDESK_SETTINGS_ENCRYPTION_KEY_FILE = keyFile;
+
+      const saved = await request(app.getHttpServer())
+        .put("/caredesk/settings")
+        .set("Cookie", ownerCookie)
+        .send({ scannerSettings: { enabled: true, model: "gpt-5.1", apiKey: rawApiKey } })
+        .expect(200);
+
+      expect(saved.body.scannerSettings).toMatchObject({
+        provider: "openai",
+        enabled: true,
+        model: "gpt-5.1",
+        apiKeyConfigured: true
+      });
+      expect(saved.body.scannerSettings.apiKey).toBeUndefined();
+      expect(JSON.stringify(saved.body)).not.toContain(rawApiKey);
+
+      const generatedSecret = readFileSync(keyFile, "utf8").trim();
+      expect(generatedSecret.length).toBeGreaterThanOrEqual(32);
+      expect(process.env.CAREDESK_SETTINGS_ENCRYPTION_KEY).toBe(generatedSecret);
+      expect(generatedSecret).not.toContain(rawApiKey);
+
+      const persisted = await prisma.caredeskSettings.findUniqueOrThrow({ where: { id: "default" } });
+      const persistedScannerSettings = JSON.stringify(persisted.scannerSettings);
+      expect(persistedScannerSettings).toContain("encryptedApiKey");
+      expect(persistedScannerSettings).not.toContain(rawApiKey);
+      await expect(app.get(CaredeskRepository).getScannerRuntimeSettings()).resolves.toMatchObject({
+        enabled: true,
+        model: "gpt-5.1",
+        apiKey: rawApiKey
+      });
+    } finally {
+      restoreEnv("CAREDESK_SETTINGS_ENCRYPTION_KEY", previousKey);
+      restoreEnv("CAREDESK_SETTINGS_ENCRYPTION_KEY_FILE", previousKeyFile);
+      rmSync(tempDir, { force: true, recursive: true });
+    }
+  });
+
   it("handles pickup reminder stages, notifications, and unclaimed action", async () => {
     const job = await moveToInProgress(app, ownerCookie, technicianCookie);
     await request(app.getHttpServer())
@@ -923,5 +972,13 @@ function extractSessionCookie(response: request.Response) {
     throw new Error("Expected caredesk_session cookie");
   }
   return cookie.split(";")[0];
+}
+
+function restoreEnv(key: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
 }
 

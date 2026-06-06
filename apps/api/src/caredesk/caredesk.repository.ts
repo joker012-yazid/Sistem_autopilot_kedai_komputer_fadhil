@@ -1,7 +1,7 @@
 ﻿import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { BadRequestException } from "@nestjs/common";
-import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
+import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from "node:crypto";
 import type {
   CaredeskChecklistReport,
   CaredeskCustomer,
@@ -37,6 +37,7 @@ import {
   toIso
 } from "./caredesk-prisma.mapper";
 import type { CaredeskDisplayRow } from "./caredesk-display";
+import { settingsEncryptionKey } from "./settings-secret";
 
 interface CreateJobBody {
   serviceReportNumber: string;
@@ -992,17 +993,9 @@ function normalizeMaxUploadBytes(value: number): number {
   return Math.min(Math.max(Math.round(value), 256 * 1024), 50 * 1024 * 1024);
 }
 
-function encryptionKey(): Buffer {
-  const secret = process.env.CAREDESK_SETTINGS_ENCRYPTION_KEY;
-  if (!secret || secret.length < 16) {
-    throw new BadRequestException("CAREDESK_SETTINGS_ENCRYPTION_KEY is required before saving scanner API keys");
-  }
-  return createHash("sha256").update(secret).digest();
-}
-
 function encryptSettingSecret(value: string): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
+  const cipher = createCipheriv("aes-256-gcm", settingsEncryptionKey(), iv);
   const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
   return `v1:${iv.toString("base64")}:${tag.toString("base64")}:${encrypted.toString("base64")}`;
@@ -1013,7 +1006,7 @@ function decryptSettingSecret(value: string): string {
   if (version !== "v1" || !ivBase64 || !tagBase64 || !encryptedBase64) {
     throw new BadRequestException("Stored scanner API key cannot be decrypted");
   }
-  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(ivBase64, "base64"));
+  const decipher = createDecipheriv("aes-256-gcm", settingsEncryptionKey(), Buffer.from(ivBase64, "base64"));
   decipher.setAuthTag(Buffer.from(tagBase64, "base64"));
   return Buffer.concat([decipher.update(Buffer.from(encryptedBase64, "base64")), decipher.final()]).toString("utf8");
 }

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { caredeskOpenApiMetadata } from "../../apps/api/src/openapi";
 import { caredeskJobStatuses, caredeskRoles } from "@repair-ops/domain";
 
@@ -69,6 +71,14 @@ describe("caredesk v2 contract", () => {
       "UNCLAIMED",
       "COMPLETE"
     ]);
+  });
+
+  it("passes scanner encryption configuration into the Docker API service", () => {
+    const compose = readFileSync(join(process.cwd(), "infra/docker/docker-compose.full.yml"), "utf8");
+
+    expect(compose).toContain("CAREDESK_SETTINGS_ENCRYPTION_KEY:");
+    expect(compose).toContain("CAREDESK_SETTINGS_ENCRYPTION_KEY_FILE:");
+    expect(compose).toContain("/app/.data/evidence/settings-encryption.key");
   });
 });
 
