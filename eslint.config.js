@@ -15,7 +15,7 @@ export default tseslint.config(
       "**/.tmp-logs/**",
       "**/tmp/**",
       "**/*.cjs",
-      "apps/web/next-env.d.ts",
+      "apps/*/next-env.d.ts",
       "packages/database/prisma/generated/**"
     ]
   },

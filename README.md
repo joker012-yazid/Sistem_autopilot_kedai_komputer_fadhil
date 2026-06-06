@@ -2,6 +2,29 @@
 
 CareDesk for Sistem Autopilot Kedai Komputer Fadhil is a repair operations app for computer shop intake, technician workflow, owner review, pickup reminders, reports, and evidence tracking.
 
+## Overview
+
+- Monorepo for the CareDesk web app, read-only display board, API, shared domain packages, and local infrastructure.
+- Built for kedai komputer daily operations: intake, diagnosis, approval, repair, pickup, reminders, reports, and evidence storage.
+- Supports separate Owner/Fadhil and Technician workflows, plus a LAN-only public display board.
+
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Quick Start on Windows](#quick-start-on-windows)
+- [Quick Start on Linux or macOS](#quick-start-on-linux-or-macos)
+- [Full Docker Setup](#full-docker-setup)
+- [Environment Variables](#environment-variables)
+- [First Owner Setup](#first-owner-setup)
+- [Display Board](#display-board)
+- [How to Use the Web App](#how-to-use-the-web-app)
+- [Common Commands](#common-commands)
+- [Verification](#verification)
+- [Troubleshooting](#troubleshooting)
+- [Deployment Notes](#deployment-notes)
+
 ## Architecture
 
 This repository is a pnpm monorepo:
@@ -201,7 +224,7 @@ After the first Owner exists, the login page switches to normal sign-in. Keep th
 
 ## Display Board
 
-The repository now includes a separate read-only display app at `/display`. This board is designed for TV, monitor, tablet, or phone use so staff can see job priorities without opening the main CareDesk system.
+The repository includes a separate read-only display app at `/display`. This board is designed for TV, monitor, tablet, or phone use so staff can see job priorities without opening the main CareDesk system.
 
 ### What the Display Board Shows
 
@@ -270,11 +293,7 @@ Use CareDesk from `http://127.0.0.1:3000/login` during local runs, or from the d
 1. Open **Settings** to confirm shop details, locked workflow rules, notification templates, and user accounts.
 2. Create Technician accounts from **Settings**. Give each technician their own email and password.
 3. Configure **Scanner AI** in **Settings**:
-   - Enable the service note scanner.
-   - Choose the OpenAI model.
-   - Enter the OpenAI API key.
-   - Set the maximum upload size.
-   - Use **Test scanner config** before asking technicians to scan service notes.
+   Enable the service note scanner, choose the OpenAI model, enter the OpenAI API key, set the maximum upload size, and use **Test scanner config** before asking technicians to scan service notes.
 4. Review technician diagnosis from **Semakan** or the job detail screen.
 5. Record Owner review instructions, POS reference, and customer decision before repair work continues.
 6. Use **Pelanggan** to review customer and device history.
@@ -380,5 +399,3 @@ Then check:
 The included Docker compose files are intended for local development and self-hosted evaluation. For real production, use strong secrets, HTTPS, managed backups, restricted storage access, and Prisma migrations instead of `db push`.
 
 See `docs/deployment.md` for the production checklist and `docs/development.md` for deeper local development notes.
-#   S i s t e m _ a u t o p i l o t _ k e d a i _ k o m p u t e r _ f a d h i l  
- 
