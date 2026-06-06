@@ -394,6 +394,16 @@ Then check:
 - If PDF export fails in a container, check API logs; the Docker API image installs Chromium and sets `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium`.
 - If Playwright fails locally, install browsers with `corepack pnpm exec playwright install`.
 
+## Additional Docs
+
+- Product requirements: `docs/product-requirements.md`
+- Domain model: `docs/domain-model.md`
+- Technical decisions: `docs/technical-decisions.md`
+- Workflow reference: `docs/repair-workflow.md`
+- Runtime architecture: `docs/architecture.md`
+- Local development: `docs/development.md`
+- Deployment: `docs/deployment.md`
+
 ## Deployment Notes
 
 The included Docker compose files are intended for local development and self-hosted evaluation. For real production, use strong secrets, HTTPS, managed backups, restricted storage access, and Prisma migrations instead of `db push`.
